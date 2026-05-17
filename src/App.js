@@ -170,6 +170,7 @@ function App() {
         columns={columns}
         initialRows={initialRows}
         addButtonLabel="Ajouter une dépense - recette"
+        fieldFocusEdit="description"
       />
     </div>
   );

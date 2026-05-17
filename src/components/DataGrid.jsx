@@ -137,6 +137,7 @@ export default function FullFeaturedCrudGrid({
     columns: customColumns,
     initialRows = [],
     addButtonLabel,
+    fieldFocusEdit = null,
 }) {
     const apiRef = useGridApiRef();
     const [rows, setRows] = React.useState(initialRows);
@@ -162,14 +163,25 @@ export default function FullFeaturedCrudGrid({
         [customColumns]
     );
 
+    const handleEditClick = React.useCallback((id) => {
+        setRowModesModel((prev) => ({
+            ...prev,
+            [id]: { mode: GridRowModes.Edit, fieldToFocus: fieldFocusEdit || customColumns[0]?.field }
+        }));
+        setTimeout(() => {
+            const cell = apiRef.current.getCellElement(id, fieldFocusEdit || customColumns[0]?.field);
+            const input = cell?.querySelector('input');
+            if (input) { input.focus(); input.select(); }
+        }, 50);
+    }, [fieldFocusEdit, customColumns, apiRef]);
+
     const handleRowEditStop = (params, event) => {
         if (params.reason === GridRowEditStopReasons.rowFocusOut) {
             event.defaultMuiPrevented = true;
         }
-    };
-
-    const handleEditClick = (id) => {
-        setRowModesModel((prev) => ({ ...prev, [id]: { mode: GridRowModes.Edit } }));
+        if (params.reason === GridRowEditStopReasons.escapeKeyDown) {
+            handleCancelClick(params.id);
+        }
     };
 
     const handleSaveClick = (id) => {
@@ -234,7 +246,7 @@ export default function FullFeaturedCrudGrid({
                 ];
             },
         },
-    ], [customColumns, rowModesModel]);
+    ], [customColumns, rowModesModel, handleEditClick]);
 
     return (
         <Box sx={{ height: 500, width: '100%', ...gridStyle }}>
@@ -250,6 +262,29 @@ export default function FullFeaturedCrudGrid({
                 onRowEditStop={handleRowEditStop}
                 processRowUpdate={processRowUpdate}
                 onCellKeyDown={(params, event) => {
+                    // Entrée sur ligne en lecture → mode édition + focus
+                    if (event.key === "Enter" && rowModesModel[params.id]?.mode !== GridRowModes.Edit) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setRowModesModel((prev) => ({
+                            ...prev,
+                            [params.id]: { mode: GridRowModes.Edit, fieldToFocus: fieldFocusEdit || customColumns[0]?.field },
+                        }));
+                        setTimeout(() => {
+                            const cell = apiRef.current.getCellElement(params.id, fieldFocusEdit || customColumns[0]?.field);
+                            const input = cell?.querySelector('input');
+                            if (input) { input.focus(); input.select(); }
+                        }, 50);
+                        return;
+                    }
+
+                    // Entrée sur champ en édition → valide la ligne
+                    if (event.key === "Enter" && rowModesModel[params.id]?.mode === GridRowModes.Edit) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleSaveClick(params.id);
+                        return;
+                    }
                     if (event.key === "Tab" && rowModesModel[params.id]?.mode === GridRowModes.Edit) {
                         const columnFields = columns
                             .map((c) => c.field)
