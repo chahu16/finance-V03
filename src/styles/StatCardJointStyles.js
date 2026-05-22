@@ -1,7 +1,7 @@
 const PALETTE = {
-    vert:   { border: '#4caf50', icon: '#4caf50', globalInstantT: '#4caf50' },
-    orange: { border: '#ff9800', icon: '#ff9800', globalInstantT: '#ff9800' },
-    rouge:  { border: '#f44336', icon: '#f44336', globalInstantT: '#f44336' },
+    vert:   { border: '#4caf50', icon: '#4caf50' },
+    orange: { border: '#ff9800', icon: '#ff9800' },
+    rouge:  { border: '#f44336', icon: '#f44336' },
 };
 
 export const cardJointSx = (color = 'vert') => ({
@@ -75,11 +75,10 @@ export const colValueMoisSx = {
     color: '#1a1a1a',
 };
 
-// Solde théorique — orange si positif, rouge si négatif
-export const colValueTheoSx = (value) => ({
+export const colValueTheoSx = {
     fontSize: '0.8rem',
-    color: value >= 0 ? '#f57c00' : '#f44336',
-});
+    color: '#1a1a1a',
+};
 
 export const colDividerSx = {
     my: 1,
@@ -100,19 +99,19 @@ export const colInstantLabelSx = {
     whiteSpace: 'nowrap',
 };
 
-// Instant T global — couleur de la carte
+// Global et MOI — couleur de la carte
 export const colInstantGlobalValueSx = (color = 'vert') => ({
     fontSize: '0.875rem',
     fontWeight: 700,
-    color: PALETTE[color].globalInstantT,
+    color: PALETTE[color].border,
 });
 
-// Instant T individuel — vert si positif, rouge si négatif
-export const colInstantValueSx = (value) => ({
+// AUTRE — toujours noir
+export const colInstantValueSx = {
     fontSize: '0.875rem',
     fontWeight: 700,
-    color: value >= 0 ? '#f57c00' : '#f44336',
-});
+    color: '#1a1a1a',
+};
 
 export const verticalDividerSx = {
     mx: 0.5,

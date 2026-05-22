@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -20,9 +20,11 @@ import StatCardJoint from './components/StatCardJoint.jsx';
 import { validateRow } from './components/utils/DepensesRecettesValidation.js';
 import { validateRow as validateCompteRow } from './components/utils/ComptesValidation.js';
 import { validateRow as validateCompteJointRow } from './components/utils/CompteJointValidation.js';
+import { validateRow as validateVirementRow } from './components/utils/VirementInternesValidation.js';
 import { DepensesRecettesColumns, initialRows, snackbarMessages, initialSort, onFieldChange } from './components/gridConfigs/DepensesRecettesGrid.js';
 import { ComptesColumns, initialRows as initialComptesRows, snackbarMessages as comptesMessages, initialSort as comptesInitialSort, extraRowDefaults as comptesExtraRowDefaults } from './components/gridConfigs/ComptesGrid.js';
 import { CompteJointColumns, snackbarMessages as compteJointMessages, initialSort as compteJointInitialSort, onFieldChange as compteJointOnFieldChange } from './components/gridConfigs/CompteJointGrid.js';
+import { VirementInternesColumns, initialRows as initialVirementRows, snackbarMessages as virementMessages, initialSort as virementInitialSort } from './components/gridConfigs/VirementInternesGrid.js';
 import { statCardsContainerSx } from './styles/StatCardStyles.js';
 import { addButtonStyle } from './styles/GridStyles.js';
 import { parametrageFormSx, formSectionTitleSx, formRowSx, computedValueSx } from './styles/CompteJointStyles.js';
@@ -38,6 +40,7 @@ function App() {
     const [tab, setTab] = useState(0);
     const [rows, setRows] = useState(initialRows);
     const [comptesRows, setComptesRows] = useState(initialComptesRows);
+    const [virementInternesRows, setVirementInternesRows] = useState(initialVirementRows);
     const [showArchivedComptes, setShowArchivedComptes] = useState(false);
     const [compteJointConfig, setCompteJointConfig] = useState({
         personne1: '',
@@ -46,6 +49,41 @@ function App() {
         pourcentageSoldeInitialMoi: null,
     });
     const [soldeInitialPctWarning, setSoldeInitialPctWarning] = useState(false);
+
+    const prevComptesRowsRef = useRef(comptesRows);
+    useEffect(() => {
+        const prev = prevComptesRowsRef.current;
+        const renames = [];
+        prev.forEach(oldC => {
+            const newC = comptesRows.find(c => c.id === oldC.id);
+            if (newC && newC.nomCompte !== oldC.nomCompte) {
+                renames.push({ oldName: oldC.nomCompte, newName: newC.nomCompte });
+            }
+        });
+        prevComptesRowsRef.current = comptesRows;
+        if (renames.length === 0) return;
+        setRows(prev => prev.map(r => {
+            const rename = renames.find(rn => rn.oldName === r.compte);
+            return rename ? { ...r, compte: rename.newName } : r;
+        }));
+        setVirementInternesRows(prev => prev.map(v => {
+            let updated = { ...v };
+            for (const { oldName, newName } of renames) {
+                if (updated.compteSource === oldName) updated = { ...updated, compteSource: newName };
+                if (updated.compteDestination === oldName) updated = { ...updated, compteDestination: newName };
+            }
+            return updated;
+        }));
+    }, [comptesRows]);
+
+    const validateCompteRowWithUniqueness = useCallback((row) => {
+        const errors = validateCompteRow(row);
+        const isDuplicate = comptesRows.some(r => r.id !== row.id && r.nomCompte === row.nomCompte);
+        if (isDuplicate) {
+            errors.nomCompte = 'Ce nom de compte existe déjà';
+        }
+        return errors;
+    }, [comptesRows]);
 
     const resolveCompteDelete = useCallback((compte) => {
         const hasLinkedRows = rows.some(r => r.compte === compte.nomCompte);
@@ -89,10 +127,20 @@ function App() {
         }],
     [showArchivedComptes, comptesRows]);
 
-    // Noms des comptes actifs (non archivés) — source de vérité pour le singleSelect
-    const activeComptesOptions = useMemo(
-        () => comptesRows.filter(c => !c.archived).map(c => c.nomCompte),
+    // Noms exclus du datagrid dépenses/recettes (archivés ou compte joint, par nom)
+    // Partagé entre activeComptesOptions et depensesRowFilter pour garantir leur cohérence.
+    const excludedComptesNames = useMemo(
+        () => new Set(comptesRows.filter(c => c.archived || c.compteJoint).map(c => c.nomCompte)),
         [comptesRows]
+    );
+
+    // Noms des comptes autorisés dans le singleSelect dépenses/recettes :
+    // ni archivé, ni joint, ni homonyme d'un compte joint/archivé
+    const activeComptesOptions = useMemo(
+        () => comptesRows
+            .filter(c => !c.archived && !c.compteJoint && !excludedComptesNames.has(c.nomCompte))
+            .map(c => c.nomCompte),
+        [comptesRows, excludedComptesNames]
     );
 
     // Compte joint actif (non archivé)
@@ -165,13 +213,27 @@ function App() {
         pourcentageMoi: Math.min(100, Math.max(0, compteJointConfig.pourcentageDefaut || 0)),
     }), [compteJointNom, compteJointConfig.pourcentageDefaut]);
 
+    // Tous les comptes non-archivés disponibles pour les virements internes (y compris compte joint)
+    const virementComptesOptions = useMemo(
+        () => comptesRows.filter(c => !c.archived).map(c => c.nomCompte),
+        [comptesRows]
+    );
+
+    // Colonnes virements internes avec valueOptions dynamique
+    const virementInternesColumns = useMemo(
+        () => VirementInternesColumns.map(col =>
+            (col.field === 'compteSource' || col.field === 'compteDestination')
+                ? { ...col, valueOptions: virementComptesOptions }
+                : col
+        ),
+        [virementComptesOptions]
+    );
+
     // Filtre appliqué au DataGrid dépenses : masque les lignes liées à un compte archivé ou compte joint
-    const depensesRowFilter = useMemo(() => {
-        const excludedSet = new Set(
-            comptesRows.filter(c => c.archived || c.compteJoint).map(c => c.nomCompte)
-        );
-        return excludedSet.size > 0 ? (row) => !excludedSet.has(row.compte) : null;
-    }, [comptesRows]);
+    const depensesRowFilter = useMemo(
+        () => excludedComptesNames.size > 0 ? (row) => !excludedComptesNames.has(row.compte) : null,
+        [excludedComptesNames]
+    );
 
     return (
         <Box sx={{ width: '100%' }}>
@@ -185,6 +247,7 @@ function App() {
                             compte={compteData.nomCompte}
                             rows={rows.filter(r => r.compte === compteData.nomCompte)}
                             compteData={compteData}
+                            virementInternesRows={virementInternesRows}
                         />
                     ))}
                     {compteJointData && compteJointData.soldeInitial != null && (
@@ -193,6 +256,7 @@ function App() {
                             rows={rows.filter(r => r.compte === compteJointData.nomCompte)}
                             compteData={compteJointData}
                             compteJointConfig={compteJointConfig}
+                            virementInternesRows={virementInternesRows}
                         />
                     )}
                 </Box>
@@ -364,6 +428,20 @@ function App() {
                                         )}
                                     </Box>
                                 )}
+                                {label === 'Virements internes' && (
+                                    <FullFeaturedCrudGrid
+                                        columns={virementInternesColumns}
+                                        initialRows={virementInternesRows}
+                                        addButtonLabel="Ajouter un virement interne"
+                                        fieldFocusEdit="compteSource"
+                                        validateRow={validateVirementRow}
+                                        messages={virementMessages}
+                                        initialSort={virementInitialSort}
+                                        onRowsChange={setVirementInternesRows}
+                                        rowDisplayField="compteSource"
+                                        height={400}
+                                    />
+                                )}
                                 {label === 'Comptes' && (
                                     <FullFeaturedCrudGrid
                                         columns={comptesColumnsWithJointControl}
@@ -371,7 +449,7 @@ function App() {
                                         onRowsChange={setComptesRows}
                                         addButtonLabel="Ajouter un compte"
                                         fieldFocusEdit="nomCompte"
-                                        validateRow={validateCompteRow}
+                                        validateRow={validateCompteRowWithUniqueness}
                                         messages={comptesMessages}
                                         initialSort={comptesInitialSort}
                                         extraRowDefaults={comptesExtraRowDefaults}

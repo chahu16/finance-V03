@@ -59,7 +59,7 @@ export const valueSx = {
 
 export const valueTheoSx = {
     fontSize: '0.875rem',
-    color: '#f57c00',
+    color: '#1a1a1a',
 };
 
 export const dividerSx = {
@@ -80,8 +80,8 @@ export const instantLabelSx = {
     color: '#1a1a1a',
 };
 
-export const instantValueSx = {
+export const instantValueSx = (color = 'vert') => ({
     fontSize: '0.95rem',
     fontWeight: 700,
-    color: '#1a1a1a',
-};
+    color: PALETTE[color].border,
+});

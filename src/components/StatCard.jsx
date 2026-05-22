@@ -19,7 +19,7 @@ function getCardColor(instantT, seuil, seuilOrange) {
     return 'rouge';
 }
 
-function StatCard({ compte, rows, compteData }) {
+function StatCard({ compte, rows, compteData, virementInternesRows = [] }) {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -42,14 +42,31 @@ function StatCard({ compte, rows, compteData }) {
             .reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
         - sommeDeCote;
 
+    // Impact net des virements internes pour ce compte
+    const virementNet = virementInternesRows.reduce((acc, v) => {
+        if (v.compteDestination === compte) return acc + (v.montant || 0);
+        if (v.compteSource === compte) return acc - (v.montant || 0);
+        return acc;
+    }, 0);
+
+    const virementNetDate = virementInternesRows
+        .filter(v => v.dateVirement != null)
+        .reduce((acc, v) => {
+            if (v.compteDestination === compte) return acc + (v.montant || 0);
+            if (v.compteSource === compte) return acc - (v.montant || 0);
+            return acc;
+        }, 0);
+
     const soldeTheorique = soldeInitial
         + rows.reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
+        + virementNet
         - sommeDeCote;
 
     const instantT = soldeInitial
         + rows
             .filter(r => r.dateDepensesRecettes != null)
             .reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
+        + virementNetDate
         - sommeDeCote;
 
     const color = getCardColor(instantT, seuil, seuilOrange);
@@ -71,7 +88,7 @@ function StatCard({ compte, rows, compteData }) {
             <Divider sx={dividerSx} />
             <Box sx={instantRowSx}>
                 <Typography sx={instantLabelSx}>Instant T :</Typography>
-                <Typography sx={instantValueSx}>{fmtEuro(instantT)}</Typography>
+                <Typography sx={instantValueSx(color)}>{fmtEuro(instantT)}</Typography>
             </Box>
         </Box>
     );

@@ -195,9 +195,11 @@ function EditToolbar({ setRows, setRowModesModel, addButtonLabel, emptyRow, fiel
 
             const colByIndex = {};
             headers.forEach((header, idx) => {
+                const h = header.toLowerCase();
                 const col = customColumns.find(c =>
                     c.field === header ||
-                    c.headerName?.toLowerCase() === header.toLowerCase()
+                    c.headerName?.toLowerCase() === h ||
+                    (Array.isArray(c.csvAliases) && c.csvAliases.some(a => a.toLowerCase() === h))
                 );
                 if (col) colByIndex[idx] = col;
             });

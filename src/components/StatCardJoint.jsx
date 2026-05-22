@@ -22,7 +22,7 @@ function getCardColor(instantT, seuil, seuilOrange) {
     return 'rouge';
 }
 
-function StatCardJoint({ compte, rows, compteData, compteJointConfig }) {
+function StatCardJoint({ compte, rows, compteData, compteJointConfig, virementInternesRows = [] }) {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -56,16 +56,31 @@ function StatCardJoint({ compte, rows, compteData, compteJointConfig }) {
     const net = (r) => (r.recettes || 0) - (r.depenses || 0);
     const sum = (list, fn) => list.reduce((acc, r) => acc + fn(r), 0);
 
+    // ── Impact net des virements internes
+    // Convention : un virement vers/depuis le compte joint est considéré 100% "moi" (p1)
+    const virementNet = virementInternesRows.reduce((acc, v) => {
+        if (v.compteDestination === compte) return acc + (v.montant || 0);
+        if (v.compteSource === compte) return acc - (v.montant || 0);
+        return acc;
+    }, 0);
+    const virementNetDate = virementInternesRows
+        .filter(v => v.dateVirement != null)
+        .reduce((acc, v) => {
+            if (v.compteDestination === compte) return acc + (v.montant || 0);
+            if (v.compteSource === compte) return acc - (v.montant || 0);
+            return acc;
+        }, 0);
+
     // ── Global ─────────────────────────────────────────────────────────────────
     const globalMois     = soldeInitial + sum(rowsMois, net) - sommeDeCote;
-    const globalTheo     = soldeInitial + sum(rows,     net) - sommeDeCote;
-    const globalInstantT = soldeInitial + sum(rowsDate, net) - sommeDeCote;
+    const globalTheo     = soldeInitial + sum(rows,     net) + virementNet     - sommeDeCote;
+    const globalInstantT = soldeInitial + sum(rowsDate, net) + virementNetDate - sommeDeCote;
 
     // ── Personne 1 ─────────────────────────────────────────────────────────────
     const p1Base     = soldeInitial * pctSoldeInitial - sommeDeCote * pctSoldeInitial;
     const p1Mois     = p1Base + sum(rowsMois, r => net(r) * pctMoi(r));
-    const p1Theo     = p1Base + sum(rows,     r => net(r) * pctMoi(r));
-    const p1InstantT = p1Base + sum(rowsDate, r => net(r) * pctMoi(r));
+    const p1Theo     = p1Base + sum(rows,     r => net(r) * pctMoi(r)) + virementNet;
+    const p1InstantT = p1Base + sum(rowsDate, r => net(r) * pctMoi(r)) + virementNetDate;
 
     // ── Personne 2 ─────────────────────────────────────────────────────────────
     const p2Base     = soldeInitial * (1 - pctSoldeInitial) - sommeDeCote * (1 - pctSoldeInitial);
@@ -98,7 +113,7 @@ function StatCardJoint({ compte, rows, compteData, compteJointConfig }) {
                     </Box>
                     <Box sx={colRowSx}>
                         <Typography sx={colLabelSx}>Solde théorique :</Typography>
-                        <Typography sx={colValueTheoSx(globalTheo)}>{fmtEuro(globalTheo)}</Typography>
+                        <Typography sx={colValueTheoSx}>{fmtEuro(globalTheo)}</Typography>
                     </Box>
                     <Divider sx={colDividerSx} />
                     <Box sx={colInstantRowSx}>
@@ -118,12 +133,12 @@ function StatCardJoint({ compte, rows, compteData, compteJointConfig }) {
                     </Box>
                     <Box sx={colRowSx}>
                         <Typography sx={colLabelSx}>Solde théorique :</Typography>
-                        <Typography sx={colValueTheoSx(p1Theo)}>{fmtEuro(p1Theo)}</Typography>
+                        <Typography sx={colValueTheoSx}>{fmtEuro(p1Theo)}</Typography>
                     </Box>
                     <Divider sx={colDividerSx} />
                     <Box sx={colInstantRowSx}>
                         <Typography sx={colInstantLabelSx}>Instant T :</Typography>
-                        <Typography sx={colInstantValueSx(p1InstantT)}>{fmtEuro(p1InstantT)}</Typography>
+                        <Typography sx={colInstantGlobalValueSx(color)}>{fmtEuro(p1InstantT)}</Typography>
                     </Box>
                 </Box>
 
@@ -138,12 +153,12 @@ function StatCardJoint({ compte, rows, compteData, compteJointConfig }) {
                     </Box>
                     <Box sx={colRowSx}>
                         <Typography sx={colLabelSx}>Solde théorique :</Typography>
-                        <Typography sx={colValueTheoSx(p2Theo)}>{fmtEuro(p2Theo)}</Typography>
+                        <Typography sx={colValueTheoSx}>{fmtEuro(p2Theo)}</Typography>
                     </Box>
                     <Divider sx={colDividerSx} />
                     <Box sx={colInstantRowSx}>
                         <Typography sx={colInstantLabelSx}>Instant T :</Typography>
-                        <Typography sx={colInstantValueSx(p2InstantT)}>{fmtEuro(p2InstantT)}</Typography>
+                        <Typography sx={colInstantValueSx}>{fmtEuro(p2InstantT)}</Typography>
                     </Box>
                 </Box>
 

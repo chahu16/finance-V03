@@ -102,6 +102,7 @@ export const CompteJointColumns = [
         editable: true,
         align: 'center',
         valueFormatter: formatPourcentage,
+        csvAliases: ['parts'],
     },
     {
         field: 'pourcentageAutre',

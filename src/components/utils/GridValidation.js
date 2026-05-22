@@ -18,6 +18,13 @@ export const getRowErrors = (row, columns, validateRow) => {
         if (col.required && isEmpty) {
             errors[col.field] = col.requiredMessage || `"${col.headerName}" est obligatoire`;
         }
+        // 1b. singleSelect : valeur hors options autorisées
+        else if (col.type === 'singleSelect' && !isEmpty && Array.isArray(col.valueOptions) && col.valueOptions.length > 0) {
+            const validOptions = col.valueOptions.map(opt => (typeof opt === 'object' ? opt.value : opt));
+            if (!validOptions.includes(value)) {
+                errors[col.field] = `"${col.headerName}" : valeur "${value}" non reconnue`;
+            }
+        }
         // 2. Validation personnalisée
         else if (typeof col.validate === 'function') {
             try {
