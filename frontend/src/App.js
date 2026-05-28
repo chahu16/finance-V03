@@ -497,6 +497,17 @@ function App() {
         }],
     [showArchivedFraisFixes]);
 
+    // Rows pré-filtrées par compte pour éviter les filter() inline dans le JSX
+    // (chaque filter() crée une nouvelle référence → re-render inutile des StatCards)
+    const rowsByCompte = useMemo(() => {
+        const map = {};
+        rows.forEach(r => {
+            if (!map[r.compte]) map[r.compte] = [];
+            map[r.compte].push(r);
+        });
+        return map;
+    }, [rows]);
+
     // Filtre appliqué au DataGrid dépenses : masque les lignes liées à un compte archivé ou compte joint
     const depensesRowFilter = useMemo(
         () => excludedComptesNames.size > 0 ? (row) => !excludedComptesNames.has(row.compte) : null,
@@ -521,7 +532,7 @@ function App() {
                         <StatCard
                             key={compteData.nomCompte}
                             compte={compteData.nomCompte}
-                            rows={rows.filter(r => r.compte === compteData.nomCompte)}
+                            rows={rowsByCompte[compteData.nomCompte] ?? []}
                             compteData={compteData}
                             virementInternesRows={virementInternesRows}
                         />
@@ -529,7 +540,7 @@ function App() {
                     {compteJointData && compteJointData.soldeInitial != null && (
                         <StatCardJoint
                             compte={compteJointData.nomCompte}
-                            rows={rows.filter(r => r.compte === compteJointData.nomCompte)}
+                            rows={rowsByCompte[compteJointData.nomCompte] ?? []}
                             compteData={compteJointData}
                             compteJointConfig={compteJointConfig}
                             virementInternesRows={virementInternesRows}

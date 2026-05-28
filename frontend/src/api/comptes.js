@@ -1,5 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_URL
-    || `http://${window.location.hostname}:8000/finances`;
+import { API_BASE, post } from './client.js';
 
 // Mapping Backend → Frontend
 const fromApi = (c) => ({
@@ -27,17 +26,6 @@ const toApi = (row) => ({
     personnes: row.personnes ?? [],
     personneProprietaire: row.personneProprietaire ?? 0,
 });
-
-const post = async (path, body) => {
-    const res = await fetch(`${API_BASE}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.message || 'Erreur serveur');
-    return json;
-};
 
 export const fetchComptes = async () => {
     const res = await fetch(`${API_BASE}/tableau-liste-comptes`);

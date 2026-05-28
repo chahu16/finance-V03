@@ -72,6 +72,21 @@ const parseBooleen = (value) => {
     return ['true', '1', 'oui', 'x', 'vrai'].includes(v);
 };
 
+// Tri commun aux endpoints dépenses/recettes et compte joint :
+// nulls en tête (chèques en cours), puis date décroissante, tiebreak alphabétique.
+const trierParDateDesc = (a, b) => {
+    const dateA = a.dateDepensesRecettes;
+    const dateB = b.dateDepensesRecettes;
+    if (!dateA && dateB) return -1;
+    if (dateA && !dateB) return 1;
+    if (new Date(dateA).getTime() === new Date(dateB).getTime()) {
+        const descA = (a.description || "").trim().toLowerCase();
+        const descB = (b.description || "").trim().toLowerCase();
+        return descA.localeCompare(descB);
+    }
+    return new Date(dateB) - new Date(dateA);
+};
+
 // --- EXPORTS ---
 
 exports.dataGridDepensesRecettes = async (req, res) => {
@@ -85,26 +100,7 @@ exports.dataGridDepensesRecettes = async (req, res) => {
 
         const dataFiltree = data.filter(d => d.compte !== null);
 
-        const formattedData = dataFiltree.map(formaterPourFront).sort((a, b) => {
-            const dateA = a.dateDepensesRecettes;
-            const dateB = b.dateDepensesRecettes;
-
-            // 1. GESTION DES DATES VIDES (Elles montent tout en haut)
-            if (!dateA && dateB) return -1;
-            if (dateA && !dateB) return 1;
-
-            // 2. SI LES DEUX SONT VIDES OU SI LES DATES SONT ÉGALES
-            // On trie par description (Ordre alphabétique A -> Z)
-            if (new Date(dateA).getTime() === new Date(dateB).getTime()) {
-                const descA = (a.description || "").trim().toLowerCase();
-                const descB = (b.description || "").trim().toLowerCase();
-                return descA.localeCompare(descB);
-            }
-
-            // 3. TRI PAR DATE DÉCROISSANT (La plus récente en premier)
-            // On compare les timestamps
-            return new Date(dateB) - new Date(dateA);
-        });
+        const formattedData = dataFiltree.map(formaterPourFront).sort(trierParDateDesc);
 
         res.status(200).json(formattedData);
     } catch (error) {
@@ -275,26 +271,7 @@ exports.dataGridCompteJoint = async (req, res) => {
         });
 
         const dataFiltree = data.filter(d => d.compte !== null);
-        const formattedData = dataFiltree.map(formaterPourFront).sort((a, b) => {
-            const dateA = a.dateDepensesRecettes;
-            const dateB = b.dateDepensesRecettes;
-
-            // 1. GESTION DES DATES VIDES (Elles montent tout en haut)
-            if (!dateA && dateB) return -1;
-            if (dateA && !dateB) return 1;
-
-            // 2. SI LES DEUX SONT VIDES OU SI LES DATES SONT ÉGALES
-            // On trie par description (Ordre alphabétique A -> Z)
-            if (new Date(dateA).getTime() === new Date(dateB).getTime()) {
-                const descA = (a.description || "").trim().toLowerCase();
-                const descB = (b.description || "").trim().toLowerCase();
-                return descA.localeCompare(descB);
-            }
-
-            // 3. TRI PAR DATE DÉCROISSANT (La plus récente en premier)
-            // On compare les timestamps
-            return new Date(dateB) - new Date(dateA);
-        });
+        const formattedData = dataFiltree.map(formaterPourFront).sort(trierParDateDesc);
 
         res.status(200).json(formattedData);
     } catch (error) {

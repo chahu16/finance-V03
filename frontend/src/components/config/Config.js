@@ -10,6 +10,12 @@ export const formatPourcent = (value) => {
     return `${Math.round(Number(value))} %`;
 };
 
+// Retourne le nom du mois courant avec initiale majuscule (ex. "Mai")
+export const getMonthLabel = (date = new Date()) => {
+    const name = date.toLocaleString('fr-FR', { month: 'long' });
+    return name.charAt(0).toUpperCase() + name.slice(1);
+};
+
 // Détermine la couleur de la carte selon le solde instant T par rapport aux seuils.
 export const getCardColor = (instantT, seuil, seuilOrange) => {
     const seuilVal = seuil ?? 0;

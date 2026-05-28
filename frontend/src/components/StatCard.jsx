@@ -1,8 +1,9 @@
+import { useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import { formatEuro, getCardColor } from './config/Config.js';
+import { formatEuro, getCardColor, getMonthLabel } from './config/Config.js';
 import {
     cardSx, headerSx, iconSx, titleSx,
     rowSx, labelSx, valueSx, valueTheoSx,
@@ -10,56 +11,61 @@ import {
 } from '../styles/StatCardStyles.js';
 
 function StatCard({ compte, rows, compteData, virementInternesRows = [] }) {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const monthName = now.toLocaleString('fr-FR', { month: 'long' });
-    const monthLabel = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
     const soldeInitial = compteData.soldeInitial ?? 0;
     const sommeDeCote = compteData.sommeDeCote ?? 0;
     const seuil = compteData.seuil ?? 0;
     const seuilOrange = compteData.seuilOrange ?? 0;
 
-    const soldeMoisCourant = soldeInitial
-        + rows
-            .filter(r => {
-                if (r.depenseRecettesAMasquer) return false;
-                if (!r.dateDepensesRecettes) return false;
-                const d = new Date(r.dateDepensesRecettes);
-                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-            })
-            .reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
-        - sommeDeCote;
+    const { soldeMoisCourant, soldeTheorique, instantT, color, monthLabel } = useMemo(() => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
 
-    // Impact net des virements internes pour ce compte
-    const virementNet = virementInternesRows.reduce((acc, v) => {
-        if (v.compteDestination === compte) return acc + (v.montant || 0);
-        if (v.compteSource === compte) return acc - (v.montant || 0);
-        return acc;
-    }, 0);
+        const soldeMoisCourant = soldeInitial
+            + rows
+                .filter(r => {
+                    if (r.depenseRecettesAMasquer) return false;
+                    if (!r.dateDepensesRecettes) return false;
+                    const d = new Date(r.dateDepensesRecettes);
+                    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                })
+                .reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
+            - sommeDeCote;
 
-    const virementNetDate = virementInternesRows
-        .filter(v => v.dateVirement != null)
-        .reduce((acc, v) => {
+        const virementNet = virementInternesRows.reduce((acc, v) => {
             if (v.compteDestination === compte) return acc + (v.montant || 0);
             if (v.compteSource === compte) return acc - (v.montant || 0);
             return acc;
         }, 0);
 
-    const soldeTheorique = soldeInitial
-        + rows.reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
-        + virementNet
-        - sommeDeCote;
+        const virementNetDate = virementInternesRows
+            .filter(v => v.dateVirement != null)
+            .reduce((acc, v) => {
+                if (v.compteDestination === compte) return acc + (v.montant || 0);
+                if (v.compteSource === compte) return acc - (v.montant || 0);
+                return acc;
+            }, 0);
 
-    const instantT = soldeInitial
-        + rows
-            .filter(r => r.dateDepensesRecettes != null)
-            .reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
-        + virementNetDate
-        - sommeDeCote;
+        const soldeTheorique = soldeInitial
+            + rows.reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
+            + virementNet
+            - sommeDeCote;
 
-    const color = getCardColor(instantT, seuil, seuilOrange);
+        const instantT = soldeInitial
+            + rows
+                .filter(r => r.dateDepensesRecettes != null)
+                .reduce((acc, r) => acc + (r.recettes || 0) - (r.depenses || 0), 0)
+            + virementNetDate
+            - sommeDeCote;
+
+        return {
+            soldeMoisCourant,
+            soldeTheorique,
+            instantT,
+            color: getCardColor(instantT, seuil, seuilOrange),
+            monthLabel: getMonthLabel(now),
+        };
+    }, [rows, virementInternesRows, compte, soldeInitial, sommeDeCote, seuil, seuilOrange]);
 
     return (
         <Box sx={cardSx(color)}>

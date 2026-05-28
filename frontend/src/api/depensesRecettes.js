@@ -1,5 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_URL
-    || `http://${window.location.hostname}:8000/finances`;
+import { API_BASE, formatDate, post } from './client.js';
 
 // Mapping Backend → Frontend
 // rembourser     → notesFraisRemboursee
@@ -19,16 +18,6 @@ const fromApi = (doc) => ({
     pourcentageMoi: Array.isArray(doc.parts) && doc.parts.length > 0 ? doc.parts[0] : 50,
 });
 
-// DD/MM/YYYY — seul format non-ISO accepté par formaterDateMidi côté backend.
-// toISOString() donnerait une chaîne UTC avec 'Z', ce qui décalerait la date
-// en timezone positive (ex. UTC+2 : 24/05 → 23/05T22:00Z).
-const formatDate = (date) => {
-    if (!date) return null;
-    const d = date instanceof Date ? date : new Date(date);
-    if (isNaN(d.getTime())) return null;
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-};
-
 // Mapping Frontend → Backend
 const toApi = (row) => ({
     id: row.id,
@@ -47,17 +36,6 @@ const toApi = (row) => ({
         row.pourcentageMoi != null ? 100 - row.pourcentageMoi : 50,
     ],
 });
-
-const post = async (path, body) => {
-    const res = await fetch(`${API_BASE}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.message || 'Erreur serveur');
-    return json;
-};
 
 // Les deux endpoints (comptes normaux + compte joint) sont chargés en parallèle
 // et fusionnés dans le même état rows.

@@ -1,5 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_URL
-    || `http://${window.location.hostname}:8000/finances`;
+import { API_BASE, formatDate, post } from './client.js';
 
 const fromApi = (doc) => ({
     id: doc.id,
@@ -9,13 +8,6 @@ const fromApi = (doc) => ({
     dateVirement: doc.dateVirement ? new Date(doc.dateVirement) : null,
 });
 
-const formatDate = (date) => {
-    if (!date) return null;
-    const d = date instanceof Date ? date : new Date(date);
-    if (isNaN(d.getTime())) return null;
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-};
-
 const toApi = (row) => ({
     id: row.id,
     compteSource: row.compteSource,
@@ -23,17 +15,6 @@ const toApi = (row) => ({
     montant: row.montant,
     dateVirement: formatDate(row.dateVirement),
 });
-
-const post = async (path, body) => {
-    const res = await fetch(`${API_BASE}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.message || 'Erreur serveur');
-    return json;
-};
 
 export const fetchVirementInternes = async () => {
     const res = await fetch(`${API_BASE}/liste-virements-internes`);

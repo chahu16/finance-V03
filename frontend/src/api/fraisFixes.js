@@ -1,5 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_URL
-    || `http://${window.location.hostname}:8000/finances`;
+import { API_BASE, post } from './client.js';
 
 // Normalise periodicite quel que soit la casse stockée en base
 const PERIODICITE_MAP = {
@@ -61,17 +60,6 @@ const toApi = (row) => {
         periodicite: row.periodicite,
         parts: pct != null && !isNaN(pct) ? [pct, 100 - pct] : [50, 50],
     };
-};
-
-const post = async (path, body) => {
-    const res = await fetch(`${API_BASE}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.message || 'Erreur serveur');
-    return json;
 };
 
 export const fetchFraisFixes = async () => {

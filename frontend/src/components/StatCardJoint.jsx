@@ -1,8 +1,9 @@
+import { useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import { formatEuro, getCardColor } from './config/Config.js';
+import { formatEuro, getCardColor, getMonthLabel } from './config/Config.js';
 import {
     cardJointSx, headerJointSx, iconJointSx, titleJointSx,
     columnsContainerSx, columnSx, columnTitleSx,
@@ -13,76 +14,87 @@ import {
 } from '../styles/StatCardJointStyles.js';
 
 function StatCardJoint({ compte, rows, compteData, compteJointConfig, virementInternesRows = [] }) {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const monthName = now.toLocaleString('fr-FR', { month: 'long' });
-    const monthLabel = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
     const soldeInitial  = compteData.soldeInitial  ?? 0;
     const sommeDeCote   = compteData.sommeDeCote   ?? 0;
     const seuil         = compteData.seuil         ?? 0;
     const seuilOrange   = compteData.seuilOrange   ?? 0;
 
-    // % du solde initial pour personne1 (utilise le champ dédié, sinon le % par défaut)
-    const pctSoldeInitial = (
-        compteJointConfig.pourcentageSoldeInitialMoi ?? compteJointConfig.pourcentageDefaut ?? 50
-    ) / 100;
+    const stats = useMemo(() => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
 
-    // % par transaction pour personne1
-    const pctMoi = (row) =>
-        ((row.pourcentageMoi ?? compteJointConfig.pourcentageDefaut ?? 50)) / 100;
+        // % du solde initial pour personne1 (utilise le champ dédié, sinon le % par défaut)
+        const pctSoldeInitial = (
+            compteJointConfig.pourcentageSoldeInitialMoi ?? compteJointConfig.pourcentageDefaut ?? 50
+        ) / 100;
 
-    const isCurrentMonth = (date) => {
-        if (!date) return false;
-        const d = new Date(date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    };
+        // % par transaction pour personne1
+        const pctMoi = (row) =>
+            ((row.pourcentageMoi ?? compteJointConfig.pourcentageDefaut ?? 50)) / 100;
 
-    // ── Helpers pour éviter la répétition ──────────────────────────────────────
-    const rowsMois = rows.filter(r => !r.depenseRecettesAMasquer && isCurrentMonth(r.dateDepensesRecettes));
-    const rowsDate = rows.filter(r => r.dateDepensesRecettes != null);
+        const isCurrentMonth = (date) => {
+            if (!date) return false;
+            const d = new Date(date);
+            return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        };
 
-    const net = (r) => (r.recettes || 0) - (r.depenses || 0);
-    const sum = (list, fn) => list.reduce((acc, r) => acc + fn(r), 0);
+        // ── Helpers pour éviter la répétition ──────────────────────────────────────
+        const rowsMois = rows.filter(r => !r.depenseRecettesAMasquer && isCurrentMonth(r.dateDepensesRecettes));
+        const rowsDate = rows.filter(r => r.dateDepensesRecettes != null);
 
-    // ── Impact net des virements internes
-    // Convention : un virement vers/depuis le compte joint est considéré 100% "moi" (p1)
-    const virementNet = virementInternesRows.reduce((acc, v) => {
-        if (v.compteDestination === compte) return acc + (v.montant || 0);
-        if (v.compteSource === compte) return acc - (v.montant || 0);
-        return acc;
-    }, 0);
-    const virementNetDate = virementInternesRows
-        .filter(v => v.dateVirement != null)
-        .reduce((acc, v) => {
+        const net = (r) => (r.recettes || 0) - (r.depenses || 0);
+        const sum = (list, fn) => list.reduce((acc, r) => acc + fn(r), 0);
+
+        // ── Impact net des virements internes
+        // Convention : un virement vers/depuis le compte joint est considéré 100% "moi" (p1)
+        const virementNet = virementInternesRows.reduce((acc, v) => {
             if (v.compteDestination === compte) return acc + (v.montant || 0);
             if (v.compteSource === compte) return acc - (v.montant || 0);
             return acc;
         }, 0);
+        const virementNetDate = virementInternesRows
+            .filter(v => v.dateVirement != null)
+            .reduce((acc, v) => {
+                if (v.compteDestination === compte) return acc + (v.montant || 0);
+                if (v.compteSource === compte) return acc - (v.montant || 0);
+                return acc;
+            }, 0);
 
-    // ── Global ─────────────────────────────────────────────────────────────────
-    const globalMois     = soldeInitial + sum(rowsMois, net) - sommeDeCote;
-    const globalTheo     = soldeInitial + sum(rows,     net) + virementNet     - sommeDeCote;
-    const globalInstantT = soldeInitial + sum(rowsDate, net) + virementNetDate - sommeDeCote;
+        // ── Global ─────────────────────────────────────────────────────────────────
+        const globalMois     = soldeInitial + sum(rowsMois, net) - sommeDeCote;
+        const globalTheo     = soldeInitial + sum(rows,     net) + virementNet     - sommeDeCote;
+        const globalInstantT = soldeInitial + sum(rowsDate, net) + virementNetDate - sommeDeCote;
 
-    // ── Personne 1 ─────────────────────────────────────────────────────────────
-    const p1Base     = soldeInitial * pctSoldeInitial - sommeDeCote * pctSoldeInitial;
-    const p1Mois     = p1Base + sum(rowsMois, r => net(r) * pctMoi(r));
-    const p1Theo     = p1Base + sum(rows,     r => net(r) * pctMoi(r)) + virementNet;
-    const p1InstantT = p1Base + sum(rowsDate, r => net(r) * pctMoi(r)) + virementNetDate;
+        // ── Personne 1 ─────────────────────────────────────────────────────────────
+        const p1Base     = soldeInitial * pctSoldeInitial - sommeDeCote * pctSoldeInitial;
+        const p1Mois     = p1Base + sum(rowsMois, r => net(r) * pctMoi(r));
+        const p1Theo     = p1Base + sum(rows,     r => net(r) * pctMoi(r)) + virementNet;
+        const p1InstantT = p1Base + sum(rowsDate, r => net(r) * pctMoi(r)) + virementNetDate;
 
-    // ── Personne 2 ─────────────────────────────────────────────────────────────
-    const p2Base     = soldeInitial * (1 - pctSoldeInitial) - sommeDeCote * (1 - pctSoldeInitial);
-    const p2Mois     = p2Base + sum(rowsMois, r => net(r) * (1 - pctMoi(r)));
-    const p2Theo     = p2Base + sum(rows,     r => net(r) * (1 - pctMoi(r)));
-    const p2InstantT = p2Base + sum(rowsDate, r => net(r) * (1 - pctMoi(r)));
+        // ── Personne 2 ─────────────────────────────────────────────────────────────
+        const p2Base     = soldeInitial * (1 - pctSoldeInitial) - sommeDeCote * (1 - pctSoldeInitial);
+        const p2Mois     = p2Base + sum(rowsMois, r => net(r) * (1 - pctMoi(r)));
+        const p2Theo     = p2Base + sum(rows,     r => net(r) * (1 - pctMoi(r)));
+        const p2InstantT = p2Base + sum(rowsDate, r => net(r) * (1 - pctMoi(r)));
 
-    const p1Label = compteJointConfig.personne1 || 'Moi';
-    const p2Label = compteJointConfig.personne2 || 'Autre';
+        return {
+            globalMois, globalTheo, globalInstantT,
+            p1Mois, p1Theo, p1InstantT,
+            p2Mois, p2Theo, p2InstantT,
+            color: getCardColor(globalInstantT, seuil, seuilOrange),
+            monthLabel: getMonthLabel(now),
+            p1Label: compteJointConfig.personne1 || 'Moi',
+            p2Label: compteJointConfig.personne2 || 'Autre',
+        };
+    }, [rows, virementInternesRows, compte, soldeInitial, sommeDeCote, seuil, seuilOrange, compteJointConfig]);
 
-
-    const color = getCardColor(globalInstantT, seuil, seuilOrange);
+    const {
+        globalMois, globalTheo, globalInstantT,
+        p1Mois, p1Theo, p1InstantT,
+        p2Mois, p2Theo, p2InstantT,
+        color, monthLabel, p1Label, p2Label,
+    } = stats;
 
     return (
         <Box sx={cardJointSx(color)}>
